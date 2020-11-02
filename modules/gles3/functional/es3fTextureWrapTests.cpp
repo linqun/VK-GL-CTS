@@ -39,6 +39,7 @@
 #include "glwEnums.hpp"
 #include "glwFunctions.hpp"
 
+#define ENABLE_OPTION2 0
 namespace deqp
 {
 namespace gles3
@@ -83,9 +84,9 @@ enum
 class TextureWrapCase : public tcu::TestCase
 {
 public:
-									TextureWrapCase			(tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 format, deUint32 dataType, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height);
-									TextureWrapCase			(tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, const std::vector<std::string>& filenames);
-									TextureWrapCase			(tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, CompressedTexFormat compressedFormat, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height);
+									TextureWrapCase			(tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 format, deUint32 dataType, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height, glu::Precision texCoordPrecision);
+									TextureWrapCase			(tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, const std::vector<std::string>& filenames, glu::Precision texCoordPrecision);
+									TextureWrapCase			(tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, CompressedTexFormat compressedFormat, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height, glu::Precision texCoordPrecision);
 									~TextureWrapCase		(void);
 
 	void							init					(void);
@@ -104,6 +105,10 @@ private:
 		Case (void) {}
 		Case (const tcu::Vec2& bl, const tcu::Vec2& tr) : bottomLeft(bl), topRight(tr) {}
 	};
+
+	tcu::Vec4 computeFixedPointThreshold(const tcu::IVec4& bits, const tcu::IVec4& colorBits);
+	float linearInterpolate(float t, float minVal, float maxVal);
+	void fillWithComponentMirrorGradients2D(const tcu::PixelBufferAccess& access, const tcu::Vec4& minVal, const tcu::Vec4& maxVal);
 
 	glu::RenderContext&				m_renderCtx;
 	const glu::ContextInfo&			m_renderCtxInfo;
@@ -127,7 +132,7 @@ private:
 	TextureRenderer					m_renderer;
 };
 
-TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 format, deUint32 dataType, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height)
+TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 format, deUint32 dataType, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height, glu::Precision texCoordPrecision)
 	: TestCase				(testCtx, name, description)
 	, m_renderCtx			(renderCtx)
 	, m_renderCtxInfo		(ctxInfo)
@@ -142,11 +147,11 @@ TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext&
 	, m_height				(height)
 	, m_caseNdx				(0)
 	, m_texture				(DE_NULL)
-	, m_renderer			(renderCtx, testCtx.getLog(), glu::GLSL_VERSION_300_ES, glu::PRECISION_MEDIUMP)
+	, m_renderer			(renderCtx, testCtx.getLog(), glu::GLSL_VERSION_300_ES, texCoordPrecision)
 {
 }
 
-TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, const std::vector<std::string>& filenames)
+TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, const std::vector<std::string>& filenames, glu::Precision texCoordPrecision)
 	: TestCase				(testCtx, name, description)
 	, m_renderCtx			(renderCtx)
 	, m_renderCtxInfo		(ctxInfo)
@@ -162,11 +167,11 @@ TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext&
 	, m_filenames			(filenames)
 	, m_caseNdx				(0)
 	, m_texture				(DE_NULL)
-	, m_renderer			(renderCtx, testCtx.getLog(), glu::GLSL_VERSION_300_ES, glu::PRECISION_MEDIUMP)
+	, m_renderer			(renderCtx, testCtx.getLog(), glu::GLSL_VERSION_300_ES, texCoordPrecision)
 {
 }
 
-TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, CompressedTexFormat compressedFormat, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height)
+TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext& renderCtx, const glu::ContextInfo& ctxInfo, const char* name, const char* description, CompressedTexFormat compressedFormat, deUint32 wrapS, deUint32 wrapT, deUint32 minFilter, deUint32 magFilter, int width, int height, glu::Precision texCoordPrecision)
 	: TestCase				(testCtx, name, description)
 	, m_renderCtx			(renderCtx)
 	, m_renderCtxInfo		(ctxInfo)
@@ -181,7 +186,7 @@ TextureWrapCase::TextureWrapCase (tcu::TestContext& testCtx, glu::RenderContext&
 	, m_height				(height)
 	, m_caseNdx				(0)
 	, m_texture				(DE_NULL)
-	, m_renderer			(renderCtx, testCtx.getLog(), glu::GLSL_VERSION_300_ES, glu::PRECISION_MEDIUMP)
+	, m_renderer			(renderCtx, testCtx.getLog(), glu::GLSL_VERSION_300_ES, texCoordPrecision)
 {
 }
 
@@ -267,7 +272,11 @@ void TextureWrapCase::init (void)
 
 		// Fill level 0.
 		m_texture->getRefTexture().allocLevel(0);
+#if ENABLE_OPTION2
+		fillWithComponentMirrorGradients2D(m_texture->getRefTexture().getLevel(0), tcu::Vec4(-0.5f, -0.5f, -0.5f, 1.5f), tcu::Vec4(1.0f, 1.0f, 1.0f, 0.0f));
+#else
 		tcu::fillWithComponentGradients(m_texture->getRefTexture().getLevel(0), tcu::Vec4(-0.5f, -0.5f, -0.5f, 2.0f), tcu::Vec4(1.0f, 1.0f, 1.0f, 0.0f));
+#endif
 
 		m_texture->upload();
 	}
@@ -289,6 +298,58 @@ void TextureWrapCase::deinit (void)
 	m_texture = DE_NULL;
 
 	m_renderer.clear();
+}
+
+tcu::Vec4 TextureWrapCase::computeFixedPointThreshold(const tcu::IVec4& bits, const tcu::IVec4& colorBits)
+{
+	tcu::Vec4 res;
+	for (int ndx = 0; ndx < 4; ndx++)
+	{
+		// 1.0f / 256 is epsilon to avoid floating compare error.
+		res[ndx] = float(colorBits[ndx] - bits[ndx] + 1 + 1.0f / 256) / ((1 << colorBits[ndx]) - 1);
+	}
+	return res;
+}
+
+float TextureWrapCase::linearInterpolate(float t, float minVal, float maxVal)
+{
+	return minVal + (maxVal - minVal) * t;
+}
+
+void TextureWrapCase::fillWithComponentMirrorGradients2D(const tcu::PixelBufferAccess& access, const tcu::Vec4& minVal, const tcu::Vec4& maxVal)
+{
+	int xedge = access.getWidth() * 0.6f;
+	int yedge = access.getHeight() * 0.6f;
+
+	for (int y = 0; y < access.getHeight(); y++)
+	{
+		for (int x = 0; x < access.getWidth(); x++)
+		{
+			float s = ((float)x + 0.5f) / (float)access.getWidth();
+			float t = ((float)y + 0.5f) / (float)access.getHeight();
+			float coefR = 0.0f;
+			float coefG = 0.0f;
+			float coefB = 0.0f;
+			float coefA = 0.0f;
+
+			coefR = (x < xedge) ? s * 0.4f : (1 - s) * 0.6f;
+			coefG = (x < xedge) ? s * 0.4f : (1 - s) * 0.6f;
+			coefB = (x < xedge) ? (1.0f - s) * 0.4f : s * 0.6f - 0.2f;
+			coefA = (x < xedge) ? (1.0f - s) * 0.4f : s * 0.6f - 0.2f;
+
+			coefR += (y < yedge) ? t * 0.4f : (1 - t) * 0.6f;
+			coefG += (y < yedge) ? (1.0f - t) * 0.4f : t * 0.6f - 0.2f;
+			coefB += (y < yedge) ? t * 0.4f : (1 - t) * 0.6f;
+			coefA += (y < yedge) ? (1.0f - t) * 0.4f : t * 0.6f - 0.2f;
+
+			float r = linearInterpolate(coefR, minVal.x(), maxVal.x());
+			float g = linearInterpolate(coefG, minVal.y(), maxVal.y());
+			float b = linearInterpolate(coefB, minVal.z(), maxVal.z());
+			float a = linearInterpolate(coefA, minVal.w(), maxVal.w());
+
+			access.setPixel(tcu::Vec4(r, g, b, a), x, y);
+		}
+	}
 }
 
 TextureWrapCase::IterateResult TextureWrapCase::iterate (void)
@@ -339,7 +400,11 @@ TextureWrapCase::IterateResult TextureWrapCase::iterate (void)
 
 		lodPrecision.derivateBits		= 18;
 		lodPrecision.lodBits			= 5;
-		lookupPrecision.colorThreshold	= tcu::computeFixedPointThreshold(colorBits) / refParams.colorScale;
+#if ENABLE_OPTION2
+		lookupPrecision.colorThreshold	= computeFixedPointThreshold(colorBits, getBitsVec(pixelFormat)) / refParams.colorScale;
+#else
+		lookupPrecision.colorThreshold = tcu::computeFixedPointThreshold(colorBits) / refParams.colorScale;
+#endif
 		lookupPrecision.coordBits		= tcu::IVec3(20,20,0);
 		lookupPrecision.uvwBits			= tcu::IVec3(5,5,0);
 		lookupPrecision.colorMask		= getCompareMask(pixelFormat);
@@ -416,12 +481,28 @@ void TextureWrapTests::init (void)
 			FOR_EACH(filter,	filteringModes,
 				{
 					const string name = string("") + wrapModes[wrapS].name + "_" + wrapModes[wrapT].name + "_" + filteringModes[filter].name + "_" + rgba8Sizes[size].name;
+					// OPTION 1:
+					glu::Precision texCoordPrecision = glu::PRECISION_MEDIUMP;
+					if (wrapModes[wrapS].mode == GL_REPEAT ||
+						wrapModes[wrapT].mode == GL_REPEAT)
+					{
+						texCoordPrecision = glu::PRECISION_HIGHP;
+					}
+					else if ((wrapModes[wrapS].mode == GL_MIRRORED_REPEAT ||
+						wrapModes[wrapT].mode == GL_MIRRORED_REPEAT) &&
+						filteringModes[filter].mode == GL_NEAREST)
+					{
+						texCoordPrecision = glu::PRECISION_HIGHP;
+					}
+					if (ENABLE_OPTION2)
+						texCoordPrecision = glu::PRECISION_MEDIUMP;
 					rgba8Group->addChild(new TextureWrapCase(m_testCtx, m_context.getRenderContext(), m_context.getContextInfo(), name.c_str(), "",
 															 GL_RGBA, GL_UNSIGNED_BYTE,
 															 wrapModes[wrapS].mode,
 															 wrapModes[wrapT].mode,
 															 filteringModes[filter].mode, filteringModes[filter].mode,
-															 rgba8Sizes[size].width, rgba8Sizes[size].height));
+															 rgba8Sizes[size].width, rgba8Sizes[size].height,
+															 texCoordPrecision));
 
 				}))));
 		}
@@ -445,7 +526,8 @@ void TextureWrapTests::init (void)
 														wrapModes[wrapS].mode,
 														wrapModes[wrapT].mode,
 														filteringModes[filter].mode, filteringModes[filter].mode,
-														potFilenames));
+														potFilenames,
+														glu::PRECISION_MEDIUMP));
 
 			})));
 
@@ -462,7 +544,8 @@ void TextureWrapTests::init (void)
 														wrapModes[wrapS].mode,
 														wrapModes[wrapT].mode,
 														filteringModes[filter].mode, filteringModes[filter].mode,
-														npotFilenames));
+														npotFilenames,
+														glu::PRECISION_MEDIUMP));
 			})));
 	}
 
@@ -513,7 +596,8 @@ void TextureWrapTests::init (void)
 															  wrapModes[wrapS].mode,
 															  wrapModes[wrapT].mode,
 															  filteringModes[filter].mode, filteringModes[filter].mode,
-															  etc2Sizes[size].width, etc2Sizes[size].height));
+															  etc2Sizes[size].width, etc2Sizes[size].height,
+															  glu::PRECISION_MEDIUMP));
 				}))));
 		}
 	}
@@ -558,7 +642,8 @@ void TextureWrapTests::init (void)
 																  wrapModes[wrapS].mode,
 																  wrapModes[wrapT].mode,
 																  filteringModes[filter].mode, filteringModes[filter].mode,
-																  formatSizes[size].width, formatSizes[size].height));
+																  formatSizes[size].width, formatSizes[size].height,
+																  glu::PRECISION_MEDIUMP));
 					}))));
 			}
 		}
